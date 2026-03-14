@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSD Detect — AI-Powered Lumpy Skin Disease Prediction</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ── DARK THEME (default) ── */
+        :root {
+            --bg: #050d0a; --surface: #0c1a14; --surface2: #122010;
+            --border: #1e3a28; --border-bright: #2d5a3d;
+            --accent: #22c55e; --accent-dim: #16a34a;
+            --accent-glow: rgba(34,197,94,0.15); --accent-glow2: rgba(34,197,94,0.06);
+            --danger: #f43f5e; --warning: #fb923c;
+            --text: #e8f5ee; --text-muted: #6b9e7e; --text-faint: #3d6b50; --white: #ffffff;
+            --shadow: rgba(0,0,0,0.4);
+        }
+
+        /* ── LIGHT THEME ── */
+        body.light {
+            --bg: #f0faf4; --surface: #ffffff; --surface2: #f0faf4;
+            --border: #c6e8d4; --border-bright: #86c9a0;
+            --accent: #16a34a; --accent-dim: #15803d;
+            --accent-glow: rgba(22,163,74,0.12); --accent-glow2: rgba(22,163,74,0.06);
+            --danger: #dc2626; --warning: #d97706;
+            --text: #0f2d1c; --text-muted: #2d6b45; --text-faint: #6b9e7e; --white: #ffffff;
+            --shadow: rgba(0,0,0,0.1);
+        }
+
+        /* ── URDU FONT ── */
+        body.urdu, body.urdu * { font-family: 'Noto Nastaliq Urdu', serif !important; }
+        body.urdu .hero h1, body.urdu .hero p,
+        body.urdu .section-title, body.urdu .feature-desc,
+        body.urdu .feature-title, body.urdu .footer-brand p { direction: rtl; text-align: right; }
+        body.urdu .nav-links { flex-direction: row-reverse; }
+        body.urdu .hero-actions { flex-direction: row-reverse; }
+        body.urdu .arch-inner { direction: rtl; }
+        body.urdu .arch-layer { flex-direction: row-reverse; }
+        body.urdu .footer-inner { direction: rtl; }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg); color: var(--text);
+            line-height: 1.6; min-height: 100vh; overflow-x: hidden;
+            transition: background .3s, color .3s;
+        }
+
+        /* NOISE TEXTURE OVERLAY */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 0; opacity: 0.4;
+        }
+        body.light::before { opacity: 0.15; }
+
+        /* ── NAV ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(5,13,10,0.85); backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border);
+            transition: background .3s, border-color .3s;
+        }
+        body.light nav { background: rgba(240,250,244,0.92); }
+
+        .nav-inner {
+            max-width: 1300px; margin: 0 auto; padding: 0 2.5rem;
+            height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        }
+        .nav-logo { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
+        .logo-icon {
+            width: 36px; height: 36px; background: var(--accent); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        }
+        .logo-text { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--text); letter-spacing: -.02em; }
+        .logo-text span { color: var(--accent); }
+
+        .nav-links { display: flex; gap: .25rem; list-style: none; align-items: center; }
+        .nav-links a {
+            text-decoration: none; color: var(--text-muted); font-size: .9rem; font-weight: 500;
+            padding: .5rem 1rem; border-radius: 6px; transition: all .2s; letter-spacing: .01em;
+        }
+        .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--surface2); }
+        .nav-cta { background: var(--accent) !important; color: var(--bg) !important; font-weight: 600 !important; }
+        .nav-cta:hover { background: var(--accent-dim) !important; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(34,197,94,.3) !important; }
+
+        /* ── NAV CONTROLS ── */
+        .nav-controls { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+
+        .lang-btn {
+            display: flex; align-items: center; gap: .4rem;
+            padding: .45rem 1rem; border-radius: 100px;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: .82rem; font-weight: 600;
+            cursor: pointer; transition: all .2s; white-space: nowrap; font-family: 'DM Sans', sans-serif;
+        }
+        .lang-btn:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+        .lang-btn .lang-flag { font-size: 1rem; }
+
+        .theme-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: 1.1rem;
+            cursor: pointer; transition: all .2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-btn:hover { background: var(--accent-glow); border-color: var(--accent); }
+
+        /* ── HERO ── */
+        .hero {
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative; padding: 8rem 2.5rem 5rem; text-align: center; overflow: hidden;
+        }
+        .hero-glow {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -60%); width: 900px; height: 600px;
+            background: radial-gradient(ellipse at center, rgba(34,197,94,.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-grid {
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 40%, transparent 100%);
+            opacity: 0.3;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: .5rem;
+            background: var(--surface); border: 1px solid var(--border-bright);
+            border-radius: 100px; padding: .4rem 1rem;
+            font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--accent);
+            margin-bottom: 2rem; position: relative; animation: fadeInUp .6s ease both;
+        }
+        .hero-badge::before {
+            content: ''; width: 6px; height: 6px; background: var(--accent);
+            border-radius: 50%; animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.5; transform:scale(.8); } }
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .hero h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(3rem,7vw,5.5rem); line-height: 1.05; letter-spacing: -.03em;
+            color: var(--text); position: relative; margin-bottom: 1.5rem;
+            animation: fadeInUp .6s .1s ease both;
+        }
+        .hero h1 em { font-style: italic; color: var(--accent); }
+        .hero p {
+            font-size: 1.15rem; color: var(--text-muted); max-width: 640px;
+            margin: 0 auto 3rem; font-weight: 400; position: relative;
+            animation: fadeInUp .6s .2s ease both;
+        }
+        .hero-actions {
+            display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+            position: relative; animation: fadeInUp .6s .3s ease both;
+        }
+        .btn {
+            display: inline-flex; align-items: center; gap: .6rem;
+            padding: .9rem 2rem; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+            font-size: .95rem; font-weight: 600; text-decoration: none; cursor: pointer;
+            border: none; transition: all .25s; letter-spacing: .01em;
+        }
+        .btn-green { background: var(--accent); color: #050d0a; }
+        .btn-green:hover { background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(34,197,94,.35); }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border-bright); }
+        .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--text-muted); }
+
+        /* ── STATS BAR ── */
+        .stats-bar {
+            max-width: 900px; margin: 5rem auto 0;
+            position: relative; animation: fadeInUp .6s .4s ease both;
+        }
+        .stats-inner {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+            padding: 2rem 3rem; display: grid; grid-template-columns: repeat(4,1fr);
+            gap: 2rem; position: relative; overflow: hidden; transition: background .3s;
+        }
+        .stats-inner::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .6;
+        }
+        .stat-item { text-align: center; }
+        .stat-num {
+            font-family: 'DM Serif Display', serif; font-size: 2.2rem; color: var(--text);
+            letter-spacing: -.03em; line-height: 1; margin-bottom: .35rem;
+        }
+        .stat-num span { color: var(--accent); }
+        .stat-lbl { font-size: .8rem; color: var(--text-faint); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; }
+
+        /* ── FEATURES SECTION ── */
+        .section { max-width: 1300px; margin: 0 auto; padding: 6rem 2.5rem; }
+        .section-label {
+            font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--accent);
+            text-transform: uppercase; letter-spacing: .15em; margin-bottom: 1rem;
+        }
+        .section-title {
+            font-family: 'DM Serif Display', serif; font-size: clamp(2rem,4vw,3rem);
+            color: var(--text); letter-spacing: -.02em; line-height: 1.15; margin-bottom: 3rem;
+        }
+        .features-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 1.5rem; }
+        .feature-card {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+            padding: 2rem; transition: all .3s; position: relative; overflow: hidden;
+        }
+        .feature-card::before {
+            content: ''; position: absolute; inset: 0; background: var(--accent-glow2);
+            opacity: 0; transition: opacity .3s;
+        }
+        .feature-card:hover { border-color: var(--border-bright); transform: translateY(-4px); box-shadow: 0 20px 40px var(--shadow); }
+        .feature-card:hover::before { opacity: 1; }
+        .feature-icon {
+            width: 48px; height: 48px; background: var(--accent-glow);
+            border: 1px solid rgba(34,197,94,.3); border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin-bottom: 1.25rem;
+        }
+        .feature-title { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: .75rem; }
+        .feature-desc { color: var(--text-muted); font-size: .95rem; line-height: 1.7; }
+
+        /* ── ARCHITECTURE SECTION ── */
+        .arch-section {
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            background: var(--surface); transition: background .3s;
+        }
+        .arch-inner {
+            max-width: 1300px; margin: 0 auto; padding: 6rem 2.5rem;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center;
+        }
+        .arch-layers { display: flex; flex-direction: column; gap: .5rem; }
+        .arch-layer {
+            display: flex; align-items: center; gap: 1rem;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1rem 1.25rem;
+            font-family: 'JetBrains Mono', monospace; font-size: .85rem;
+            color: var(--text-muted); transition: all .2s;
+        }
+        .arch-layer:hover { border-color: var(--border-bright); color: var(--text); }
+        .arch-layer-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .dot-input { background: #60a5fa; }
+        .dot-backbone { background: #a78bfa; }
+        .dot-attention { background: var(--accent); }
+        .dot-pool { background: #fb923c; }
+        .dot-dense { background: #e879f9; }
+        .dot-output { background: var(--accent); }
+        .arch-connector {
+            width: 2px; height: 16px;
+            background: linear-gradient(to bottom, var(--border), var(--border-bright));
+            margin-left: 1.875rem;
+        }
+
+        /* ── CTA ── */
+        .cta-section { max-width: 1300px; margin: 0 auto; padding: 6rem 2.5rem; text-align: center; }
+        .cta-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 24px; padding: 5rem 3rem; position: relative; overflow: hidden;
+            transition: background .3s;
+        }
+        .cta-card::before {
+            content: ''; position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+            width: 500px; height: 200px;
+            background: radial-gradient(ellipse at center, rgba(34,197,94,.12), transparent 70%);
+        }
+        .cta-card h2 {
+            font-family: 'DM Serif Display', serif; font-size: clamp(2rem,4vw,3rem);
+            color: var(--text); margin-bottom: 1rem; letter-spacing: -.02em;
+        }
+        .cta-card p { color: var(--text-muted); font-size: 1.1rem; margin-bottom: 2.5rem; }
+
+        /* ── FOOTER ── */
+        footer { border-top: 1px solid var(--border); background: var(--surface); transition: background .3s; }
+        .footer-inner {
+            max-width: 1300px; margin: 0 auto; padding: 4rem 2.5rem 2rem;
+            display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem;
+        }
+        .footer-brand p { color: var(--text-muted); font-size: .9rem; margin-top: 1rem; max-width: 280px; line-height: 1.7; }
+        .footer-col h4 {
+            font-size: .8rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--text-faint); margin-bottom: 1rem;
+        }
+        .footer-col a, .footer-col p {
+            display: block; color: var(--text-muted); text-decoration: none;
+            font-size: .9rem; margin-bottom: .5rem; transition: color .2s;
+        }
+        .footer-col a:hover { color: var(--text); }
+        .footer-bottom {
+            max-width: 1300px; margin: 0 auto; padding: 1.5rem 2.5rem;
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .footer-bottom p { color: var(--text-faint); font-size: .85rem; }
+
+        @media (max-width: 900px) {
+            .features-grid { grid-template-columns: 1fr; }
+            .arch-inner { grid-template-columns: 1fr; gap: 3rem; }
+            .footer-inner { grid-template-columns: 1fr 1fr; }
+            .stats-inner { grid-template-columns: repeat(2,1fr); }
+            .nav-links { display: none; }
+            .lang-btn span.lang-label { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <div class="logo-icon">🐄</div>
+            <span class="logo-text">LSD<span>Detect</span></span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html" class="active" data-en="Home" data-ur="ہوم">Home</a></li>
+            <li><a href="predict.html" data-en="Prediction" data-ur="تشخیص">Prediction</a></li>
+            <li><a href="dashboard.html" data-en="Dashboard" data-ur="ڈیش بورڈ">Dashboard</a></li>
+            <li><a href="report.html" data-en="Reports" data-ur="رپورٹ">Reports</a></li>
+            <li><a href="predict.html" class="nav-cta" data-en="Run Analysis →" data-ur="تجزیہ چلائیں ←">Run Analysis →</a></li>
+        </ul>
+        <div class="nav-controls">
+            <button class="lang-btn" id="langBtn" onclick="toggleLanguage()">
+                <span class="lang-flag">🇵🇰</span>
+                <span class="lang-label" id="langLabel">اردو</span>
+            </button>
+            <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-grid"></div>
+
+
+    <h1 id="heroTitle">
+        Detect Lumpy Skin Disease<br>
+        <em data-en="before it spreads" data-ur="پھیلنے سے پہلے">before it spreads</em>
+    </h1>
+
+    <p data-en="Detect Lumpy Skin Disease with AI-powered precision — combining image analysis and environmental data for rapid, accurate cattle health insights."
+       data-ur="اے آئی کی طاقت سے لمپی اسکن ڈیزیز کی درست تشخیص — تصویری تجزیہ اور ماحولیاتی ڈیٹا کو یکجا کر کے مویشیوں کی صحت کے بارے میں تیز اور قابلِ اعتماد معلومات فراہم کرنا۔">
+        EfficientNet-B3 powered AI with PSAM &amp; ECA attention — combining image analysis and environmental data for rapid, accurate cattle disease diagnosis.
+    </p>
+
+    <div class="hero-actions">
+        <a href="predict.html" class="btn btn-green">
+            <span data-en="Start Prediction" data-ur="تشخیص شروع کریں">Start Prediction</span>
+        </a>
+        <a href="dashboard.html" class="btn btn-ghost">
+            <span data-en="View Dashboard" data-ur="ڈیش بورڈ دیکھیں">View Dashboard</span>
+        </a>
+    </div>
+
+</section>
+
+<!-- FEATURES -->
+<section class="section">
+    <h2 class="section-title" data-en="Everything you need to diagnose with confidence" data-ur="اعتماد کے ساتھ تشخیص کرنے کے لیے سب کچھ">Everything you need to<br>diagnose with confidence</h2>
+
+    <div class="features-grid">
+        <div class="feature-card">
+            <h3 class="feature-title" data-en="Deep Learning Backbone" data-ur="گہری تعلیم کی بنیاد">Deep Learning Backbone</h3>
+            <p class="feature-desc"
+               data-en="Built on EfficientNet-B3 with custom PSAM (Pyramid Segmentation Attention Module) and ECA (Efficient Channel Attention) for superior feature extraction and localization."
+               data-ur="EfficientNet-B3 پر بنایا گیا، کسٹم PSAM اور ECA ماڈیولز کے ساتھ جو بہترین فیچر نکالنے اور لوکلائزیشن فراہم کرتے ہیں۔">
+                Built on EfficientNet-B3 with custom PSAM (Pyramid Segmentation Attention Module) and ECA (Efficient Channel Attention) for superior feature extraction and localization.
+            </p>
+        </div>
+        <div class="feature-card">
+            <h3 class="feature-title" data-en="Environmental Risk Modeling" data-ur="ماحولیاتی خطرہ ماڈلنگ">Environmental Risk Modeling</h3>
+            <p class="feature-desc"
+               data-en="Fuses 11 climate variables — temperature, humidity, precipitation, vapor pressure — to assess environmental disease transmission risk alongside visual diagnosis."
+               data-ur="11 آب و ہوا کے متغیرات کو یکجا کرتا ہے — درجہ حرارت، نمی، بارش، بخارات کا دباؤ — بصری تشخیص کے ساتھ ساتھ ماحولیاتی خطرے کا جائزہ لینے کے لیے۔">
+                Fuses 11 climate variables — temperature, humidity, precipitation, vapor pressure — to assess environmental disease transmission risk alongside visual diagnosis.
+            </p>
+        </div>
+        <div class="feature-card">
+            <h3 class="feature-title" data-en="Real-Time Inference" data-ur="حقیقی وقت میں تجزیہ">Real-Time Inference</h3>
+            <p class="feature-desc"
+               data-en="Get predictions in under 3 seconds with confidence scores, risk levels, and ranked recommendations delivered instantly via the Flask REST API."
+               data-ur="3 سیکنڈ سے کم میں تشخیص حاصل کریں — اعتماد کے اسکور، خطرے کی سطح، اور فوری سفارشات Flask REST API کے ذریعے۔">
+                Get predictions in under 3 seconds with confidence scores, risk levels, and ranked recommendations delivered instantly via the Flask REST API.
+            </p>
+        </div>
+        <div class="feature-card">
+            <h3 class="feature-title" data-en="Structured Reports" data-ur="منظم رپورٹیں">Structured Reports</h3>
+            <p class="feature-desc"
+               data-en="Every prediction generates a full diagnostic report with case ID, environmental analysis, model metrics, and actionable veterinary recommendations for documentation."
+               data-ur="ہر تشخیص ایک مکمل تشخیصی رپورٹ تیار کرتی ہے جس میں کیس ID، ماحولیاتی تجزیہ، ماڈل میٹرکس اور قابل عمل جانوروں کی سفارشات شامل ہیں۔">
+                Every prediction generates a full diagnostic report with case ID, environmental analysis, model metrics, and actionable veterinary recommendations for documentation.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+    <div class="cta-card">
+        
+        <h2 data-en="Ready to run your first analysis?" data-ur="کیا آپ اپنا پہلا تجزیہ چلانے کے لیے تیار ہیں؟">Ready to run your first analysis?</h2>
+        <p data-en="Upload a cattle image, input environmental data, and receive an AI-powered diagnostic report in seconds."
+           data-ur="مویشی کی تصویر اپ لوڈ کریں، ماحولیاتی ڈیٹا درج کریں، اور سیکنڈوں میں مصنوعی ذہانت سے تشخیصی رپورٹ حاصل کریں۔">
+            Upload a cattle image, input environmental data, and receive an AI-powered diagnostic report in seconds.
+        </p>
+        <a href="predict.html" class="btn btn-green" style="font-size:1rem;padding:1rem 2.5rem;">
+            <span data-en="Start Prediction Now →" data-ur="ابھی تشخیص شروع کریں ←">Start Prediction Now →</span>
+        </a>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <div class="footer-inner">
+        <div class="footer-brand">
+            <a href="index.html" class="nav-logo" style="text-decoration:none;">
+                <div class="logo-icon">🐄</div>
+                <span class="logo-text">LSD<span>Detect</span></span>
+            </a>
+            <p data-en="Advanced deep learning for veterinary diagnostics. Designed for rapid, accurate Lumpy Skin Disease detection in cattle."
+               data-ur="جانوروں کی تشخیص کے لیے جدید ڈیپ لرننگ۔ مویشیوں میں گانٹھ دار جلد کی بیماری کی تیز اور درست تشخیص کے لیے ڈیزائن کیا گیا۔">
+                Advanced deep learning for veterinary diagnostics. Designed for rapid, accurate Lumpy Skin Disease detection in cattle.
+            </p>
+        </div>
+        <div class="footer-col">
+            <h4 data-en="Navigation" data-ur="نیویگیشن">Navigation</h4>
+            <a href="index.html" data-en="Home" data-ur="ہوم">Home</a>
+            <a href="predict.html" data-en="Prediction" data-ur="تشخیص">Prediction</a>
+            <a href="dashboard.html" data-en="Dashboard" data-ur="ڈیش بورڈ">Dashboard</a>
+            <a href="report.html" data-en="Reports" data-ur="رپورٹ">Reports</a>
+        </div>
+        <div class="footer-col">
+            <h4 data-en="Technology" data-ur="ٹیکنالوجی">Technology</h4>
+            <p>EfficientNet-B3</p>
+            <p>PSAM Attention</p>
+            <p>ECA Attention</p>
+            <p>TensorFlow / Keras</p>
+        </div>
+        <div class="footer-col">
+            <h4 data-en="Contact" data-ur="رابطہ">Contact</h4>
+            <p data-en="22-cs-114@student.hitecuni.edu.pk" data-ur="22-cs-114@student.hitecuni.edu.pk">22-cs-114@student.hitecuni.edu.pk</p>
+            <p data-en="Dept. of CS" data-ur="شعبہ مصنوعی ذہانت اور مشین لرننگ">Dept. of CS</p>
+            <p data-en="Veterinary Diagnostics" data-ur="جانوروں کی تشخیص">Veterinary Diagnostics</p>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <p data-en="© 2025 LSDDetect — Lumpy Skin Disease Prediction System" data-ur="© 2025 LSDDetect — گانٹھ دار جلد کی بیماری کا نظام تشخیص">© 2025 LSDDetect — Lumpy Skin Disease Prediction System</p>
+        <p data-en="For research and diagnostic assistance only" data-ur="صرف تحقیق اور تشخیصی مدد کے لیے">For research and diagnostic assistance only</p>
+    </div>
+</footer>
+
+<script>
+    // ─────────────────────────────────────────────
+    // THEME
+    // ─────────────────────────────────────────────
+    function toggleTheme() {
+        const isLight = document.body.classList.toggle('light');
+        document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
+        localStorage.setItem('lsdTheme', isLight ? 'light' : 'dark');
+    }
+
+    // ─────────────────────────────────────────────
+    // LANGUAGE
+    // ─────────────────────────────────────────────
+    let currentLang = localStorage.getItem('lsdLang') || 'en';
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'en' ? 'ur' : 'en';
+        localStorage.setItem('lsdLang', currentLang);
+        applyLanguage();
+    }
+
+    function applyLanguage() {
+        const isUrdu = currentLang === 'ur';
+
+        // Toggle Urdu font/RTL class
+        document.body.classList.toggle('urdu', isUrdu);
+
+        // Update lang button
+        document.querySelector('.lang-flag').textContent = isUrdu ? '🇬🇧' : '🇵🇰';
+        document.getElementById('langLabel').textContent  = isUrdu ? 'English' : 'اردو';
+
+        // Translate all elements with data-en / data-ur
+        document.querySelectorAll('[data-en]').forEach(el => {
+            const text = isUrdu ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+            if (!text) return;
+            if (el.children.length === 0) {
+                el.textContent = text;
+            } else {
+                el.innerHTML = text;
+            }
+        });
+
+        // Hero h1 has a nested <em> — rebuild manually
+        const heroTitle = document.getElementById('heroTitle');
+        if (heroTitle) {
+            heroTitle.innerHTML = isUrdu
+                ? 'گانٹھ دار جلد کی بیماری تشخیص کریں<br><em>پھیلنے سے پہلے</em>'
+                : 'Detect Lumpy Skin Disease<br><em>before it spreads</em>';
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // INIT — restore saved preferences
+    // ─────────────────────────────────────────────
+    window.addEventListener('load', () => {
+        const savedTheme = localStorage.getItem('lsdTheme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light');
+            document.getElementById('themeBtn').textContent = '🌙';
+        } else {
+            document.getElementById('themeBtn').textContent = '☀️';
+        }
+        currentLang = localStorage.getItem('lsdLang') || 'en';
+        applyLanguage();
+    });
+</script>
+</body>
+</html>

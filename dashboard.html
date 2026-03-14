@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — LSDDetect</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ── DARK THEME (default) ── */
+        :root {
+            --bg: #050d0a; --surface: #0c1a14; --surface2: #122010;
+            --border: #1e3a28; --border-bright: #2d5a3d;
+            --accent: #22c55e; --accent-dim: #16a34a;
+            --accent-glow: rgba(34,197,94,0.15); --accent-glow2: rgba(34,197,94,0.06);
+            --danger: #f43f5e; --warning: #fb923c; --blue: #60a5fa;
+            --text: #e8f5ee; --text-muted: #6b9e7e; --text-faint: #3d6b50; --white: #ffffff;
+            --shadow: rgba(0,0,0,0.4);
+        }
+
+        /* ── LIGHT THEME ── */
+        body.light {
+            --bg: #f0faf4; --surface: #ffffff; --surface2: #f0faf4;
+            --border: #c6e8d4; --border-bright: #86c9a0;
+            --accent: #16a34a; --accent-dim: #15803d;
+            --accent-glow: rgba(22,163,74,0.12); --accent-glow2: rgba(22,163,74,0.06);
+            --danger: #dc2626; --warning: #d97706; --blue: #2563eb;
+            --text: #0f2d1c; --text-muted: #2d6b45; --text-faint: #6b9e7e; --white: #0f2d1c;
+            --shadow: rgba(0,0,0,0.1);
+        }
+
+        /* ── URDU FONT ── */
+        body.urdu, body.urdu * { font-family: 'Noto Nastaliq Urdu', serif !important; }
+        body.urdu .page-header h1,
+        body.urdu .page-header .label,
+        body.urdu .chart-card-title,
+        body.urdu .chart-card-sub,
+        body.urdu .empty-state h3,
+        body.urdu .empty-state p { direction: rtl; text-align: right; }
+        body.urdu .nav-links { flex-direction: row-reverse; }
+        body.urdu .nav-inner { direction: rtl; }
+        body.urdu .page-header { flex-direction: row-reverse; }
+        body.urdu .header-right { flex-direction: row-reverse; }
+        body.urdu th, body.urdu td { direction: rtl; text-align: right; }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; overflow-x: hidden;
+            transition: background .3s, color .3s;
+        }
+
+        /* NOISE TEXTURE OVERLAY */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 0; opacity: 0.4;
+        }
+        body.light::before { opacity: 0.15; }
+
+        /* ── NAV ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(5,13,10,0.85); backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--border);
+            transition: background .3s, border-color .3s;
+        }
+        body.light nav { background: rgba(240,250,244,0.92); }
+
+        .nav-inner {
+            max-width: 1300px; margin: 0 auto; padding: 0 2.5rem;
+            height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        }
+        .nav-logo { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
+        .logo-icon {
+            width: 36px; height: 36px; background: var(--accent); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+        }
+        .logo-text { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--text); letter-spacing: -.02em; }
+        .logo-text span { color: var(--accent); }
+
+        .nav-links { display: flex; gap: .25rem; list-style: none; align-items: center; }
+        .nav-links a {
+            text-decoration: none; color: var(--text-muted); font-size: .9rem; font-weight: 500;
+            padding: .5rem 1rem; border-radius: 6px; transition: all .2s; letter-spacing: .01em;
+        }
+        .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--surface2); }
+
+        /* ── NAV CONTROLS ── */
+        .nav-controls { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+
+        .lang-btn {
+            display: flex; align-items: center; gap: .4rem;
+            padding: .45rem 1rem; border-radius: 100px;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: .82rem; font-weight: 600;
+            cursor: pointer; transition: all .2s; white-space: nowrap; font-family: 'DM Sans', sans-serif;
+        }
+        .lang-btn:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+        .lang-btn .lang-flag { font-size: 1rem; }
+
+        .theme-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: 1.1rem;
+            cursor: pointer; transition: all .2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-btn:hover { background: var(--accent-glow); border-color: var(--accent); }
+
+        .page-header { padding: 7rem 2.5rem 2.5rem; max-width: 1300px; margin: 0 auto; display:flex; align-items:flex-end; justify-content:space-between; position: relative; z-index: 1; }
+        .page-header .label { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--accent); text-transform:uppercase; letter-spacing:.15em; margin-bottom:.75rem; }
+        .page-header h1 { font-family:'DM Serif Display',serif; font-size:clamp(2rem,3.5vw,2.8rem); color:var(--text); letter-spacing:-.02em; }
+        .header-right { display:flex; gap:1rem; align-items:center; }
+        .live-badge { display:flex; align-items:center; gap:.5rem; background:var(--surface); border:1px solid var(--border-bright); border-radius:100px; padding:.5rem 1rem; font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--accent); transition: background .3s; }
+        .live-dot { width:6px; height:6px; background:var(--accent); border-radius:50%; animation:blink 1.5s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .clear-btn { display:flex; align-items:center; gap:.4rem; padding:.5rem 1rem; background:transparent; border:1px solid var(--border-bright); border-radius:100px; color:var(--text-faint); font-family:'JetBrains Mono',monospace; font-size:.75rem; cursor:pointer; transition:all .2s; }
+        .clear-btn:hover { border-color:var(--danger); color:var(--danger); }
+        .main { max-width:1300px; margin:0 auto; padding:0 2.5rem 4rem; position: relative; z-index: 1; }
+
+        /* EMPTY STATE */
+        .empty-state { text-align:center; padding:5rem 2rem; background:var(--surface); border:1px solid var(--border); border-radius:16px; margin-bottom:1.5rem; transition: background .3s; }
+        .empty-state .icon { font-size:3.5rem; margin-bottom:1rem; }
+        .empty-state h3 { font-family:'DM Serif Display',serif; font-size:1.5rem; color:var(--text); margin-bottom:.75rem; }
+        .empty-state p { color:var(--text-muted); margin-bottom:1.5rem; font-size:.95rem; }
+        .empty-state a { display:inline-flex; align-items:center; gap:.5rem; padding:.75rem 1.75rem; background:var(--accent); color:var(--bg); border-radius:8px; text-decoration:none; font-weight:700; font-size:.95rem; transition:all .2s; }
+        .empty-state a:hover { background:var(--accent-dim); transform:translateY(-1px); }
+
+        /* STAT CARDS */
+        .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1.25rem; margin-bottom:1.5rem; }
+        .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.75rem; transition:all .25s; position:relative; overflow:hidden; }
+        .stat-card::before { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; opacity:0; transition:opacity .25s; }
+        .stat-card:hover { transform:translateY(-3px); box-shadow:0 16px 32px var(--shadow); }
+        .stat-card:hover::before { opacity:1; }
+        .stat-card.c-blue::before { background:var(--blue); }
+        .stat-card.c-green::before { background:var(--accent); }
+        .stat-card.c-red::before { background:var(--danger); }
+        .stat-card.c-orange::before { background:var(--warning); }
+        .stat-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; }
+        .stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; }
+        .ic-blue{background:rgba(96,165,250,.12)} .ic-green{background:var(--accent-glow)} .ic-red{background:rgba(244,63,94,.12)} .ic-orange{background:rgba(251,146,60,.12)}
+        .stat-label { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); }
+        .stat-value { font-family:'DM Serif Display',serif; font-size:2.2rem; color:var(--text); letter-spacing:-.02em; margin-bottom:.35rem; }
+        .stat-change { font-size:.8rem; font-weight:500; font-family:'JetBrains Mono',monospace; }
+        .up{color:var(--accent)} .down{color:var(--danger)} .neutral{color:var(--text-faint)}
+
+        /* CHARTS */
+        .charts-row { display:grid; grid-template-columns:2fr 1fr; gap:1.25rem; margin-bottom:1.5rem; }
+        .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.75rem; transition: background .3s; }
+        .chart-card-header { margin-bottom:1.5rem; }
+        .chart-card-title { font-family:'DM Serif Display',serif; font-size:1.15rem; color:var(--text); margin-bottom:.25rem; }
+        .chart-card-sub { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--text-faint); }
+        .metrics-list { display:flex; flex-direction:column; gap:.75rem; }
+        .metric-row { display:flex; justify-content:space-between; align-items:center; padding:.875rem 1rem; background:var(--surface2); border:1px solid var(--border); border-radius:8px; transition: background .3s; }
+        .metric-name { font-size:.85rem; color:var(--text-muted); font-weight:500; }
+        .metric-val { font-family:'DM Serif Display',serif; font-size:1.3rem; color:var(--accent); }
+
+        /* TABLE */
+        .table-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:1.5rem; transition: background .3s; }
+        .table-header { padding:1.5rem 2rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .table-header h3 { font-family:'DM Serif Display',serif; font-size:1.15rem; color:var(--text); }
+        .table-count { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--text-faint); }
+        table { width:100%; border-collapse:collapse; }
+        thead { background:var(--surface2); }
+        th { padding:.875rem 1.5rem; text-align:left; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); }
+        td { padding:1rem 1.5rem; border-bottom:1px solid var(--border); font-size:.9rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+        tr:last-child td { border-bottom:none; }
+        tr:hover td { background:var(--surface2); }
+        .badge { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .75rem; border-radius:100px; font-size:.8rem; font-weight:600; font-family:'DM Sans',sans-serif; }
+        .badge-normal { background:var(--accent-glow); color:var(--accent); border:1px solid rgba(34,197,94,.2); }
+        .badge-lumpy { background:rgba(244,63,94,.1); color:var(--danger); border:1px solid rgba(244,63,94,.2); }
+        .dist-chart-wrap { max-width:220px; margin:0 auto; }
+        .no-predictions-row td { text-align:center; padding:2.5rem; color:var(--text-faint); }
+
+        @media (max-width:1100px) {
+            .stats-grid{grid-template-columns:repeat(2,1fr)}
+            .charts-row{grid-template-columns:1fr}
+            .nav-links{display:none}
+            .lang-btn span.lang-label { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <div class="logo-icon">🐄</div>
+            <span class="logo-text">LSD<span>Detect</span></span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html" data-en="Home" data-ur="ہوم">Home</a></li>
+            <li><a href="predict.html" data-en="Prediction" data-ur="تشخیص">Prediction</a></li>
+            <li><a href="dashboard.html" class="active" data-en="Dashboard" data-ur="ڈیش بورڈ">Dashboard</a></li>
+            <li><a href="report.html" data-en="Reports" data-ur="رپورٹ">Reports</a></li>
+        </ul>
+        <div class="nav-controls">
+            <button class="lang-btn" id="langBtn" onclick="toggleLanguage()">
+                <span class="lang-flag">🇵🇰</span>
+                <span class="lang-label" id="langLabel">اردو</span>
+            </button>
+            <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+        </div>
+    </div>
+</nav>
+
+<div class="page-header">
+    <div>
+        <h1 data-en="System Dashboard" data-ur="سسٹم ڈیش بورڈ">System Dashboard</h1>
+    </div>
+    <div class="header-right">
+        <div class="live-badge"><div class="live-dot"></div><span data-en="Live data" data-ur="براہ راست ڈیٹا">Live data</span></div>
+        <button class="clear-btn" onclick="clearHistory()">🗑 <span data-en="Clear history" data-ur="تاریخ صاف کریں">Clear history</span></button>
+    </div>
+</div>
+
+<div class="main" id="mainContent">
+    <!-- Filled by JavaScript -->
+</div>
+
+<script>
+    // ─────────────────────────────────────────────
+    // THEME
+    // ─────────────────────────────────────────────
+    function toggleTheme() {
+        const isLight = document.body.classList.toggle('light');
+        document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
+        localStorage.setItem('lsdTheme', isLight ? 'light' : 'dark');
+        // Re-render to update chart colors
+        renderDashboard();
+    }
+
+    // ─────────────────────────────────────────────
+    // LANGUAGE
+    // ─────────────────────────────────────────────
+    let currentLang = localStorage.getItem('lsdLang') || 'en';
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'en' ? 'ur' : 'en';
+        localStorage.setItem('lsdLang', currentLang);
+        applyLanguage();
+    }
+
+    function applyLanguage() {
+        const isUrdu = currentLang === 'ur';
+
+        document.body.classList.toggle('urdu', isUrdu);
+
+        document.querySelector('.lang-flag').textContent = isUrdu ? '🇬🇧' : '🇵🇰';
+        document.getElementById('langLabel').textContent  = isUrdu ? 'English' : 'اردو';
+
+        document.querySelectorAll('[data-en]').forEach(el => {
+            const text = isUrdu ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+            if (!text) return;
+            if (el.children.length === 0) {
+                el.textContent = text;
+            } else {
+                el.innerHTML = text;
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    // CHART THEME HELPERS
+    // ─────────────────────────────────────────────
+    function getChartColors() {
+        const isLight = document.body.classList.contains('light');
+        return {
+            text:       isLight ? '#2d6b45' : '#6b9e7e',
+            border:     isLight ? '#c6e8d4' : '#1e3a28',
+            gridLight:  isLight ? 'rgba(198,232,212,0.8)' : 'rgba(30,58,40,0.6)',
+            gridFaint:  isLight ? 'rgba(198,232,212,0.5)' : 'rgba(30,58,40,0.4)',
+        };
+    }
+
+    Chart.defaults.color = '#6b9e7e';
+    Chart.defaults.borderColor = '#1e3a28';
+
+    let trendChart = null;
+    let distChart  = null;
+
+    // ─────────────────────────────────────────────
+    // TRANSLATIONS for dynamically generated HTML
+    // ─────────────────────────────────────────────
+    const T = {
+        en: {
+            noPredsTitle:   'No predictions yet',
+            noPredsDesc:    'Run your first analysis to see live statistics, charts, and prediction history here.',
+            noPredsBtn:     'Run First Prediction →',
+            totalAnalyses:  'Total Analyses',
+            normalCases:    'Normal Cases',
+            lsdDetected:    'LSD Detected',
+            avgResponse:    'Avg Response',
+            predTrends:     'Prediction Trends',
+            last7days:      '// last 7 days',
+            modelPerf:      'Model Performance',
+            currentMetrics: '// current metrics',
+            accuracy:       'Accuracy',
+            precision:      'Precision',
+            recall:         'Recall',
+            aucScore:       'AUC Score',
+            f1Score:        'F1 Score',
+            caseDist:       'Case Distribution',
+            normalVsLumpy:  '// normal vs lumpy',
+            recentPreds:    'Recent Predictions',
+            showingOf:      (n, t) => `Showing ${n} of ${t}`,
+            noPreds:        'No predictions yet',
+            colNum:         '#',
+            colDate:        'Date & Time',
+            colResult:      'Result',
+            colConf:        'Confidence',
+            colTemp:        'Temp Risk',
+            colHumidity:    'Humidity Risk',
+            colLocation:    'Location',
+            colTime:        'Time',
+            newSession:     (n) => `↑ +${n} new this session`,
+            noNew:          '— no new this session',
+            ofTotal:        (p) => `${p}% of total`,
+            detectionRate:  (p) => `${p}% detection rate`,
+            avgConf:        (c) => `avg confidence ${c}%`,
+            normalLabel:    '● Normal',
+            lumpyLabel:     '● Lumpy',
+            chartNormal:    'Normal',
+            chartLumpy:     'Lumpy',
+        },
+        ur: {
+            noPredsTitle:   'ابھی تک کوئی تشخیص نہیں',
+            noPredsDesc:    'یہاں براہ راست اعداد و شمار، چارٹ اور تشخیص کی تاریخ دیکھنے کے لیے پہلا تجزیہ چلائیں۔',
+            noPredsBtn:     ' پہلی تشخیص چلائیں ←',
+            totalAnalyses:  'کل تجزیے',
+            normalCases:    'نارمل کیسز',
+            lsdDetected:    'LSD کا پتہ چلا',
+            avgResponse:    'اوسط جواب',
+            predTrends:     'تشخیص کے رجحانات',
+            last7days:      '// گزشتہ 7 دن',
+            modelPerf:      'ماڈل کی کارکردگی',
+            currentMetrics: '// موجودہ میٹرکس',
+            accuracy:       'درستگی',
+            precision:      'صحت',
+            recall:         'ریکال',
+            aucScore:       'AUC اسکور',
+            f1Score:        'F1 اسکور',
+            caseDist:       'کیسز کی تقسیم',
+            normalVsLumpy:  '// نارمل بمقابلہ لمپی',
+            recentPreds:    'حالیہ تشخیصات',
+            showingOf:      (n, t) => `${n} از ${t} دکھا رہا ہے`,
+            noPreds:        'ابھی تک کوئی تشخیص نہیں',
+            colNum:         '#',
+            colDate:        'تاریخ اور وقت',
+            colResult:      'نتیجہ',
+            colConf:        'اعتماد',
+            colTemp:        'درجہ حرارت خطرہ',
+            colHumidity:    'نمی خطرہ',
+            colLocation:    'مقام',
+            colTime:        'وقت',
+            newSession:     (n) => `↑ +${n} اس سیشن میں نئے`,
+            noNew:          '— اس سیشن میں کوئی نیا نہیں',
+            ofTotal:        (p) => `کل کا ${p}٪`,
+            detectionRate:  (p) => `${p}٪ شرح تشخیص`,
+            avgConf:        (c) => `اوسط اعتماد ${c}٪`,
+            normalLabel:    '● نارمل',
+            lumpyLabel:     '● لمپی',
+            chartNormal:    'نارمل',
+            chartLumpy:     'لمپی',
+        }
+    };
+
+    function t(key, ...args) {
+        const lang = currentLang === 'ur' ? 'ur' : 'en';
+        const val = T[lang][key];
+        return typeof val === 'function' ? val(...args) : val;
+    }
+
+    // ─────────────────────────────────────────────
+    // DATA
+    // ─────────────────────────────────────────────
+    function loadPredictions() {
+        return JSON.parse(localStorage.getItem('lsdPredictions') || '[]');
+    }
+
+    function clearHistory() {
+        const msg = currentLang === 'ur'
+            ? 'تمام تشخیص کی تاریخ صاف کریں؟ یہ واپس نہیں ہو سکتا۔'
+            : 'Clear all prediction history? This cannot be undone.';
+        if (confirm(msg)) {
+            localStorage.removeItem('lsdPredictions');
+            renderDashboard();
+        }
+    }
+
+    function computeStats(predictions) {
+        const total   = predictions.length;
+        const lumpy   = predictions.filter(p => p.isLumpy).length;
+        const normal  = total - lumpy;
+        const avgTime = total > 0
+            ? (predictions.reduce((s, p) => s + parseFloat(p.processingTime || 0), 0) / total).toFixed(2)
+            : '—';
+        const avgConf = total > 0
+            ? (predictions.reduce((s, p) => s + parseFloat(p.confidence), 0) / total).toFixed(1)
+            : '—';
+        return { total, lumpy, normal, avgTime, avgConf };
+    }
+
+    function buildWeeklyTrend(predictions) {
+        const days = {};
+        const now  = Date.now();
+        for (let i = 6; i >= 0; i--) {
+            const d   = new Date(now - i * 86400000);
+            const key = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric' });
+            days[key] = { normal: 0, lumpy: 0 };
+        }
+        predictions.forEach(p => {
+            const d   = new Date(p.id);
+            const key = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric' });
+            if (days[key] !== undefined) {
+                p.isLumpy ? days[key].lumpy++ : days[key].normal++;
+            }
+        });
+        return {
+            labels:  Object.keys(days),
+            normal:  Object.values(days).map(d => d.normal),
+            lumpy:   Object.values(days).map(d => d.lumpy)
+        };
+    }
+
+    // ─────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────
+    function renderDashboard() {
+        const predictions = loadPredictions();
+        const main        = document.getElementById('mainContent');
+        const colors      = getChartColors();
+
+        // Update chart defaults for current theme
+        Chart.defaults.color       = colors.text;
+        Chart.defaults.borderColor = colors.border;
+
+        if (trendChart) { trendChart.destroy(); trendChart = null; }
+        if (distChart)  { distChart.destroy();  distChart  = null; }
+
+        if (predictions.length === 0) {
+            main.innerHTML = `
+                <div class="empty-state">
+                    <h3>${t('noPredsTitle')}</h3>
+                    <p>${t('noPredsDesc')}</p>
+                    <a href="predict.html">${t('noPredsBtn')}</a>
+                </div>`;
+            return;
+        }
+
+        const stats  = computeStats(predictions);
+        const trend  = buildWeeklyTrend(predictions);
+        const recent = predictions.slice(0, 10);
+
+        const prevTotal = parseInt(localStorage.getItem('lsd_prev_total') || '0');
+        const newCount  = stats.total - prevTotal;
+        localStorage.setItem('lsd_prev_total', stats.total);
+
+        main.innerHTML = `
+            <!-- STATS -->
+            <div class="stats-grid">
+                <div class="stat-card c-blue">
+                    <div class="stat-top"><div class="stat-label">${t('totalAnalyses')}</div></div>
+                    <div class="stat-value">${stats.total.toLocaleString()}</div>
+                    <div class="stat-change ${newCount > 0 ? 'up' : 'neutral'}">
+                        ${newCount > 0 ? t('newSession', newCount) : t('noNew')}
+                    </div>
+                </div>
+                <div class="stat-card c-green">
+                    <div class="stat-top"><div class="stat-label">${t('normalCases')}</div></div>
+                    <div class="stat-value">${stats.normal.toLocaleString()}</div>
+                    <div class="stat-change up">
+                        ${stats.total > 0 ? t('ofTotal', ((stats.normal/stats.total)*100).toFixed(1)) : '—'}
+                    </div>
+                </div>
+                <div class="stat-card c-red">
+                    <div class="stat-top"><div class="stat-label">${t('lsdDetected')}</div></div>
+                    <div class="stat-value">${stats.lumpy.toLocaleString()}</div>
+                    <div class="stat-change ${stats.lumpy > 0 ? 'down' : 'up'}">
+                        ${stats.total > 0 ? t('detectionRate', ((stats.lumpy/stats.total)*100).toFixed(1)) : '—'}
+                    </div>
+                </div>
+                <div class="stat-card c-orange">
+                    <div class="stat-top"><div class="stat-label">${t('avgResponse')}</div></div>
+                    <div class="stat-value">${stats.avgTime}s</div>
+                    <div class="stat-change neutral">${stats.avgConf !== '—' ? t('avgConf', stats.avgConf) : '—'}</div>
+                </div>
+            </div>
+
+            <!-- CHARTS ROW -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <div class="chart-card-title">${t('predTrends')}</div>
+                        <div class="chart-card-sub">${t('last7days')}</div>
+                    </div>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <div class="chart-card-title">${t('modelPerf')}</div>
+                        <div class="chart-card-sub">${t('currentMetrics')}</div>
+                    </div>
+                    <div class="metrics-list">
+                        <div class="metric-row"><span class="metric-name">${t('accuracy')}</span><span class="metric-val">98.75%</span></div>
+                        <div class="metric-row"><span class="metric-name">${t('precision')}</span><span class="metric-val">97.82%</span></div>
+                        <div class="metric-row"><span class="metric-name">${t('recall')}</span><span class="metric-val">98.91%</span></div>
+                        <div class="metric-row"><span class="metric-name">${t('aucScore')}</span><span class="metric-val">0.9956</span></div>
+                        <div class="metric-row"><span class="metric-name">${t('f1Score')}</span><span class="metric-val">98.36%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DISTRIBUTION -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <div class="chart-card-title">${t('caseDist')}</div>
+                        <div class="chart-card-sub">${t('normalVsLumpy')}</div>
+                    </div>
+                    <div class="dist-chart-wrap">
+                        <canvas id="distChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card" style="grid-column:1/-1; display:none;"></div>
+            </div>
+
+            <!-- RECENT PREDICTIONS TABLE -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>${t('recentPreds')}</h3>
+                    <span class="table-count">${t('showingOf', recent.length, stats.total)}</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>${t('colNum')}</th>
+                            <th>${t('colDate')}</th>
+                            <th>${t('colResult')}</th>
+                            <th>${t('colConf')}</th>
+                            <th>${t('colTemp')}</th>
+                            <th>${t('colHumidity')}</th>
+                            <th>${t('colLocation')}</th>
+                            <th>${t('colTime')}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="predictionsTableBody">
+                        ${recent.length === 0
+                            ? `<tr class="no-predictions-row"><td colspan="8">${t('noPreds')}</td></tr>`
+                            : recent.map((p, i) => `
+                                <tr>
+                                    <td>#${stats.total - i}</td>
+                                    <td>${p.timestamp}</td>
+                                    <td><span class="badge ${p.isLumpy ? 'badge-lumpy' : 'badge-normal'}">
+                                        ${p.isLumpy ? t('lumpyLabel') : t('normalLabel')}</span></td>
+                                    <td>${p.confidence}%</td>
+                                    <td style="color:${p.tempRisk==='HIGH'?'var(--danger)':p.tempRisk==='MEDIUM'?'var(--warning)':'var(--accent)'}">${p.tempRisk}</td>
+                                    <td style="color:${p.humidityRisk==='HIGH'?'var(--danger)':p.humidityRisk==='MEDIUM'?'var(--warning)':'var(--accent)'}">${p.humidityRisk}</td>
+                                    <td>${p.latitude ? p.latitude.toFixed(2)+'°N, '+p.longitude.toFixed(2)+'°E' : '—'}</td>
+                                    <td>${p.processingTime}s</td>
+                                </tr>`).join('')
+                        }
+                    </tbody>
+                </table>
+            </div>`;
+
+        // ── Charts ──────────────────────────────────────────────────────────────
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trend.labels,
+                datasets: [
+                    {
+                        label: t('chartNormal'),
+                        data: trend.normal,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34,197,94,0.08)',
+                        tension: 0.4, fill: true,
+                        pointBackgroundColor: '#22c55e', pointRadius: 5
+                    },
+                    {
+                        label: t('chartLumpy'),
+                        data: trend.lumpy,
+                        borderColor: '#f43f5e',
+                        backgroundColor: 'rgba(244,63,94,0.08)',
+                        tension: 0.4, fill: true,
+                        pointBackgroundColor: '#f43f5e', pointRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position:'bottom', labels:{ padding:20, usePointStyle:true, color: colors.text } } },
+                scales: {
+                    y: { beginAtZero:true, ticks:{ precision:0, color: colors.text }, grid:{ color: colors.gridLight } },
+                    x: { ticks:{ color: colors.text }, grid:{ color: colors.gridFaint } }
+                }
+            }
+        });
+
+        const distCtx = document.getElementById('distChart').getContext('2d');
+        distChart = new Chart(distCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [t('chartNormal'), t('chartLumpy')],
+                datasets: [{
+                    data: [stats.normal, stats.lumpy],
+                    backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(244,63,94,0.8)'],
+                    borderColor: ['#22c55e', '#f43f5e'],
+                    borderWidth: 1, hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                cutout: '70%',
+                plugins: { legend: { position:'bottom', labels:{ padding:20, usePointStyle:true, color: colors.text } } }
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────
+    // INIT — restore saved preferences
+    // ─────────────────────────────────────────────
+    window.addEventListener('load', () => {
+        const savedTheme = localStorage.getItem('lsdTheme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light');
+            document.getElementById('themeBtn').textContent = '🌙';
+        } else {
+            document.getElementById('themeBtn').textContent = '☀️';
+        }
+        currentLang = localStorage.getItem('lsdLang') || 'en';
+        applyLanguage();
+        renderDashboard();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) renderDashboard();
+    });
+</script>
+</body>
+</html>

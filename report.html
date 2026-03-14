@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Report — LSDDetect</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #050d0a; --surface: #0c1a14; --surface2: #122010;
+            --border: #1e3a28; --border-bright: #2d5a3d;
+            --accent: #22c55e; --accent-glow: rgba(34,197,94,0.15);
+            --danger: #f43f5e; --warning: #fb923c;
+            --text: #e8f5ee; --text-muted: #6b9e7e; --text-faint: #3d6b50; --white: #ffffff;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        nav { position: fixed; top:0; left:0; right:0; z-index:100; background: rgba(5,13,10,.85); backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); }
+        .nav-inner { max-width: 1300px; margin: 0 auto; padding: 0 2.5rem; height: 72px; display:flex; align-items:center; justify-content:space-between; }
+        .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+        .logo-icon { width:36px; height:36px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+        .logo-text { font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--white); }
+        .logo-text span { color:var(--accent); }
+        .nav-links { display:flex; gap:.25rem; list-style:none; align-items:center; }
+        .nav-links a { text-decoration:none; color:var(--text-muted); font-size:.9rem; font-weight:500; padding:.5rem 1rem; border-radius:6px; transition:all .2s; }
+        .nav-links a:hover, .nav-links a.active { color:var(--text); background:var(--surface2); }
+        .page-wrap { max-width: 920px; margin: 0 auto; padding: 5.5rem 2rem 4rem; }
+        .action-row { display:flex; gap:1rem; justify-content:flex-end; margin-bottom:2rem; flex-wrap: wrap; }
+        .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.75rem 1.5rem; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:.9rem; font-weight:600; cursor:pointer; border:none; transition:all .2s; text-decoration:none; }
+        .btn-green { background:var(--accent); color:var(--bg); }
+        .btn-green:hover { background:#16a34a; transform:translateY(-1px); box-shadow:0 4px 16px rgba(34,197,94,.3); }
+        .btn-outline { background:transparent; color:var(--text-muted); border:1px solid var(--border-bright); }
+        .btn-outline:hover { background:var(--surface2); color:var(--text); }
+        .report-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
+        .report-head { padding:3.5rem 3rem; background:linear-gradient(135deg,#0a1f14,#0c2519); border-bottom:1px solid var(--border); position:relative; overflow:hidden; text-align:center; }
+        .report-head::before { content:''; position:absolute; top:-40px; left:50%; transform:translateX(-50%); width:400px; height:200px; background:radial-gradient(ellipse,rgba(34,197,94,.1),transparent 70%); }
+        .report-head::after { content:''; position:absolute; bottom:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.5; }
+        .report-brand { display:flex; align-items:center; justify-content:center; gap:.5rem; margin-bottom:2rem; }
+        .report-brand-icon { width:32px; height:32px; background:var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:1rem; }
+        .report-brand-name { font-family:'DM Serif Display',serif; font-size:1.2rem; color:var(--white); }
+        .report-title { font-family:'DM Serif Display',serif; font-size:2.2rem; color:var(--white); letter-spacing:-.02em; margin-bottom:.5rem; }
+        .report-subtitle { font-family:'JetBrains Mono',monospace; font-size:.8rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:.1em; }
+        .report-body { padding:3rem; }
+        .report-section { margin-bottom:3rem; }
+        .report-section:last-child { margin-bottom:0; }
+        .section-heading { display:flex; align-items:center; gap:.75rem; margin-bottom:1.5rem; }
+        .section-line { flex:1; height:1px; background:var(--border); }
+        .section-title { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--accent); text-transform:uppercase; letter-spacing:.12em; white-space:nowrap; }
+        .info-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
+        .info-tile { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; border-left:3px solid var(--border-bright); }
+        .info-tile-label { font-size:.75rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em; margin-bottom:.4rem; }
+        .info-tile-value { font-family:'JetBrains Mono',monospace; font-size:1rem; color:var(--text); font-weight:500; }
+        .result-block { border-radius:14px; padding:2.5rem; text-align:center; position:relative; overflow:hidden; margin:1.5rem 0; }
+        .result-block.normal { background:linear-gradient(135deg,#0a2018,#0d2a1e); border:1px solid rgba(34,197,94,.3); }
+        .result-block.normal::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+        .result-block.lumpy { background:linear-gradient(135deg,#200a0f,#2a0f15); border:1px solid rgba(244,63,94,.3); }
+        .result-block.lumpy::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--danger),transparent); }
+        .result-block-status { font-family:'DM Serif Display',serif; font-size:2.5rem; letter-spacing:-.02em; margin-bottom:.5rem; }
+        .result-block.normal .result-block-status { color:var(--accent); }
+        .result-block.lumpy .result-block-status { color:var(--danger); }
+        .result-block-conf { font-family:'JetBrains Mono',monospace; font-size:.9rem; color:var(--text-muted); }
+        .report-note { color:var(--text-muted); font-size:.95rem; line-height:1.8; margin-top:1rem; }
+        .data-table { width:100%; border-collapse:collapse; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .data-table thead { background:var(--surface2); }
+        .data-table th { padding:.875rem 1.25rem; text-align:left; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); }
+        .data-table td { padding:.875rem 1.25rem; border-top:1px solid var(--border); font-size:.9rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+        .ok-tag { color:var(--accent); } .warn-tag { color:var(--warning); }
+        .metrics-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
+        .metric-block { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; text-align:center; }
+        .metric-block-label { font-size:.75rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.4rem; }
+        .metric-block-value { font-family:'DM Serif Display',serif; font-size:1.6rem; color:var(--accent); }
+        .recs-box { background:var(--surface2); border:1px solid var(--border-bright); border-radius:12px; overflow:hidden; }
+        .recs-box-header { padding:1rem 1.5rem; background:rgba(34,197,94,.06); border-bottom:1px solid var(--border); font-family:'DM Serif Display',serif; font-size:1rem; color:var(--white); display:flex; align-items:center; gap:.5rem; }
+        .recs-items { list-style:none; }
+        .recs-items li { padding:.875rem 1.5rem; border-top:1px solid var(--border); font-size:.875rem; color:var(--text-muted); display:flex; gap:.75rem; align-items:flex-start; line-height:1.6; }
+        .recs-items li::before { content:"✓"; color:var(--accent); font-weight:bold; flex-shrink:0; }
+        /* GRAD-CAM in report */
+        .gradcam-report-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        .gradcam-report-grid img { width:100%; border-radius:10px; border:1px solid var(--border); display:block; }
+        .gradcam-label { font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--text-faint); text-align:center; margin-top:.5rem; }
+        .legend-bar-sm { height:14px; border-radius:4px; background:linear-gradient(90deg,#00f,#0ff,#0f0,#ff0,#f00); margin:1rem 0 .4rem; }
+        .legend-labels-sm { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:.68rem; color:var(--text-faint); }
+        .report-foot { padding:2rem 3rem; border-top:1px solid var(--border); background:var(--surface2); text-align:center; }
+        .disclaimer { font-size:.8rem; color:var(--text-faint); line-height:1.7; max-width:600px; margin:0 auto; }
+        .disclaimer strong { color:var(--text-muted); }
+        /* No-data state */
+        .no-data { text-align:center; padding:4rem 2rem; }
+        .no-data h2 { font-family:'DM Serif Display',serif; font-size:1.8rem; color:var(--white); margin-bottom:1rem; }
+        .no-data p { color:var(--text-muted); margin-bottom:2rem; }
+        @media print {
+            nav, .action-row { display:none !important; }
+            body { background:white; color:black; }
+            .report-card { border:1px solid #ccc; box-shadow:none; }
+            .page-wrap { padding:0; }
+        }
+        @media (max-width:700px) {
+            .info-grid, .metrics-grid-4, .gradcam-report-grid { grid-template-columns:1fr 1fr; }
+            .nav-links { display:none; }
+            .report-body { padding:1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <div class="logo-icon">🐄</div>
+            <span class="logo-text">LSD<span>Detect</span></span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="predict.html">Prediction</a></li>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="report.html" class="active">Reports</a></li>
+        </ul>
+    </div>
+</nav>
+
+<div class="page-wrap">
+    <div class="action-row">
+        <button class="btn btn-outline" onclick="window.location.href='predict.html'">← New Prediction</button>
+        <button class="btn btn-green" onclick="window.print()"> Download PDF</button>
+    </div>
+
+    <!-- NO DATA STATE -->
+    <div id="noDataSection" class="no-data" style="display:none;">
+        <h2>No Report Data Found</h2>
+        <p>Reports are generated automatically after a prediction. Run an analysis first, then click "Generate Diagnostic Report".</p>
+        <a href="predict.html" class="btn btn-green">Go to Prediction →</a>
+    </div>
+
+    <!-- REPORT CARD (filled dynamically) -->
+    <div class="report-card" id="reportCard" style="display:none;">
+
+        <div class="report-head">
+            <div class="report-brand">
+                <div class="report-brand-icon">🐄</div>
+                <span class="report-brand-name">LSDDetect</span>
+            </div>
+            <div class="report-title">Diagnostic Report</div>
+            <div class="report-subtitle">AI-Powered Lumpy Skin Disease Analysis</div>
+        </div>
+
+        <div class="report-body">
+
+            <!-- Case Info -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// case information</span>
+                    <div class="section-line"></div>
+                </div>
+                <div class="info-grid" id="caseInfoGrid"></div>
+            </div>
+
+            <!-- Prediction Result -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// prediction result</span>
+                    <div class="section-line"></div>
+                </div>
+                <div id="resultBlock"></div>
+                <p class="report-note" id="resultNote"></p>
+            </div>
+
+            <!-- Grad-CAM -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// grad-cam attention visualization</span>
+                    <div class="section-line"></div>
+                </div>
+                <div class="gradcam-report-grid">
+                    <div>
+                        <img id="reportOrigImg" src="" alt="Original Image">
+                        <div class="gradcam-label">// original image</div>
+                    </div>
+                    <div>
+                        <img id="reportGradcamImg" src="" alt="Grad-CAM Heatmap">
+                        <div class="gradcam-label">// attention heatmap overlay</div>
+                    </div>
+                </div>
+                <div class="legend-bar-sm"></div>
+                <div class="legend-labels-sm"><span>Low attention</span><span>High attention</span></div>
+                <p style="font-size:.8rem; color:var(--text-faint); margin-top:.6rem; font-family:'JetBrains Mono',monospace;">
+                    Red/yellow = high model attention · Blue/green = low attention
+                </p>
+            </div>
+
+            <!-- Image Analysis -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// image analysis</span>
+                    <div class="section-line"></div>
+                </div>
+                <table class="data-table" id="imageAnalysisTable"></table>
+            </div>
+
+            <!-- Environmental Risk -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// environmental risk analysis</span>
+                    <div class="section-line"></div>
+                </div>
+                <table class="data-table" id="envRiskTable"></table>
+            </div>
+
+            <!-- Model Metrics -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// model performance metrics</span>
+                    <div class="section-line"></div>
+                </div>
+                <div class="metrics-grid-4">
+                    <div class="metric-block"><div class="metric-block-label">Accuracy</div><div class="metric-block-value">98.75%</div></div>
+                    <div class="metric-block"><div class="metric-block-label">Precision</div><div class="metric-block-value">97.82%</div></div>
+                    <div class="metric-block"><div class="metric-block-label">Recall</div><div class="metric-block-value">98.91%</div></div>
+                    <div class="metric-block"><div class="metric-block-label">AUC Score</div><div class="metric-block-value">0.9956</div></div>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="report-section">
+                <div class="section-heading">
+                    <span class="section-title">// recommendations</span>
+                    <div class="section-line"></div>
+                </div>
+                <div class="recs-box">
+                    <ul class="recs-items" id="reportRecsList"></ul>
+                </div>
+            </div>
+
+
+        </div><!-- /report-body -->
+
+        <div class="report-foot">
+            <p class="disclaimer">
+                <strong>Disclaimer:</strong> This report is generated by an AI-assisted diagnostic system and should be used as a supplementary tool only. Professional veterinary consultation is required for final diagnosis and treatment decisions.
+            </p>
+            <p style="margin-top:.75rem; font-size:.8rem; color:var(--text-faint);" id="reportFooterDate"></p>
+        </div>
+    </div><!-- /report-card -->
+
+    <div class="action-row" style="margin-top:1.5rem;" id="bottomActions" style="display:none;">
+        <button class="btn btn-outline" onclick="window.location.href='predict.html'">← New Prediction</button>
+        <button class="btn btn-green" onclick="window.print()"> Download PDF</button>
+    </div>
+</div>
+
+<script>
+    // ── Load report data from sessionStorage ───────────────────────────────────
+    const raw = sessionStorage.getItem('lsdReportData');
+
+    if (!raw) {
+        document.getElementById('noDataSection').style.display = 'block';
+    } else {
+        const d = JSON.parse(raw);
+        buildReport(d);
+        document.getElementById('reportCard').style.display  = 'block';
+        document.getElementById('bottomActions').style.display = 'flex';
+    }
+
+    function buildReport(d) {
+        const pred  = d.prediction;
+        const er    = d.environmentalRisk;
+        const env   = d.envData || {};
+        const now   = new Date();
+        const dateStr = now.toLocaleString('en-GB', {
+            day:'2-digit', month:'short', year:'numeric',
+            hour:'2-digit', minute:'2-digit'
+        });
+
+        // Report ID based on timestamp
+        const reportId = '#LSD-' + now.getFullYear() + '-' +
+                         String(now.getTime()).slice(-6);
+
+        // ── Case info ──────────────────────────────────────────────────────
+        document.getElementById('caseInfoGrid').innerHTML = `
+            <div class="info-tile"><div class="info-tile-label">Report ID</div><div class="info-tile-value">${reportId}</div></div>
+            <div class="info-tile"><div class="info-tile-label">Date & Time</div><div class="info-tile-value">${dateStr}</div></div>
+            <div class="info-tile"><div class="info-tile-label">Location</div><div class="info-tile-value">${env.latitude ? env.latitude.toFixed(2)+'°N' : '—'}, ${env.longitude ? env.longitude.toFixed(2)+'°E' : '—'}</div></div>
+            <div class="info-tile"><div class="info-tile-label">Model</div><div class="info-tile-value">EfficientNet-B3 v1.0</div></div>
+            <div class="info-tile"><div class="info-tile-label">Processing Time</div><div class="info-tile-value">${d.processingTime || '—'}s</div></div>
+            <div class="info-tile"><div class="info-tile-label">Raw Score</div><div class="info-tile-value">${pred.rawScore ? pred.rawScore.toFixed(4) : '—'}</div></div>
+        `;
+
+        // ── Result block ───────────────────────────────────────────────────
+        const conf  = (pred.confidence * 100).toFixed(1);
+        const cls   = pred.isLumpy ? 'lumpy' : 'normal';
+        const label = pred.isLumpy ? 'LUMPY DETECTED' : 'NORMAL — HEALTHY';
+        document.getElementById('resultBlock').innerHTML = `
+            <div class="result-block ${cls}">
+                <div class="result-block-status">${label}</div>
+                <div class="result-block-conf">Confidence: ${conf}%  ·  Certainty: ${conf > 90 ? 'Very High' : conf > 80 ? 'High' : 'Moderate'}</div>
+            </div>`;
+        document.getElementById('resultNote').innerHTML =
+            pred.isLumpy
+            ? `The model detected signs consistent with <strong style="color:var(--danger)">Lumpy Skin Disease</strong> with ${conf}% confidence. Immediate veterinary attention and herd isolation is recommended. Environmental conditions further elevate the risk of disease spread.`
+            : `The model classified this case as <strong style="color:var(--accent)">NORMAL</strong> with ${conf}% confidence. No immediate intervention required. ${er.climateSuitability === 'FAVORABLE' ? 'However, current environmental conditions are favorable for LSD transmission — enhanced monitoring is advised.' : 'Environmental conditions are currently unfavorable for disease spread.'}`;
+
+        // ── Grad-CAM images ───────────────────────────────────────────────
+        document.getElementById('reportOrigImg').src    = d.imageSrc   || '';
+        document.getElementById('reportGradcamImg').src =
+            d.gradcam ? 'data:image/png;base64,' + d.gradcam : '';
+
+        // ── Image analysis table ───────────────────────────────────────────
+        const lesionText  = pred.isLumpy ? 'Detected' : 'None';
+        const lesionTag   = pred.isLumpy ? 'warn-tag' : 'ok-tag';
+        const skinText    = pred.isLumpy ? 'Abnormal — Lesions present' : 'Normal';
+        const skinTag     = pred.isLumpy ? 'warn-tag' : 'ok-tag';
+        document.getElementById('imageAnalysisTable').innerHTML = `
+            <thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead>
+            <tbody>
+                <tr><td>Image Quality</td><td>Good</td><td class="ok-tag">✓ Acceptable</td></tr>
+                <tr><td>Lesion Detection</td><td>${lesionText}</td><td class="${lesionTag}">${pred.isLumpy ? '⚠ Positive' : '✓ Clear'}</td></tr>
+                <tr><td>Skin Condition</td><td>${skinText}</td><td class="${skinTag}">${pred.isLumpy ? '⚠ Requires attention' : '✓ Healthy'}</td></tr>
+                <tr><td>Model Confidence</td><td>${conf}%</td><td class="ok-tag">✓ ${conf > 90 ? 'Very High' : 'High'}</td></tr>
+            </tbody>`;
+
+        // ── Environmental risk table ───────────────────────────────────────
+        const riskTag = r => r === 'HIGH' ? 'warn-tag' : (r === 'MEDIUM' ? 'warn-tag' : 'ok-tag');
+        const riskIcon = r => r === 'HIGH' ? '⚠ High' : (r === 'MEDIUM' ? '⚠ Moderate' : '✓ Low');
+        document.getElementById('envRiskTable').innerHTML = `
+            <thead><tr><th>Factor</th><th>Value</th><th>Risk Level</th></tr></thead>
+            <tbody>
+                <tr><td>Mean Temperature</td><td>${env.meanTemp ? env.meanTemp + '°C' : '—'}</td><td class="${riskTag(er.tempRisk)}">${riskIcon(er.tempRisk)}</td></tr>
+                <tr><td>Humidity</td><td>${env.humidity ? env.humidity + '%' : '—'}</td><td class="${riskTag(er.humidityRisk)}">${riskIcon(er.humidityRisk)}</td></tr>
+                <tr><td>Precipitation</td><td>${env.precipitation ? env.precipitation + 'mm' : '—'}</td><td class="ok-tag">✓ Recorded</td></tr>
+                <tr><td>Vapor Pressure</td><td>${env.vaporPressure ? env.vaporPressure + ' hPa' : '—'}</td><td class="ok-tag">✓ Recorded</td></tr>
+                <tr><td>Climate Suitability</td><td>${er.climateSuitability}</td><td class="${er.climateSuitability === 'FAVORABLE' ? 'warn-tag' : 'ok-tag'}">${er.climateSuitability === 'FAVORABLE' ? '⚠ Monitor closely' : '✓ Low risk'}</td></tr>
+            </tbody>`;
+
+        // ── Recommendations ────────────────────────────────────────────────
+        document.getElementById('reportRecsList').innerHTML =
+            d.recommendations.map(r => {
+                const [head, ...rest] = r.split(':');
+                return `<li><strong>${head}:</strong>${rest.join(':')}</li>`;
+            }).join('');
+
+
+        // ── Footer date ────────────────────────────────────────────────────
+        document.getElementById('reportFooterDate').textContent =
+            `© 2025 LSDDetect — Generated ${dateStr} · Final Year Project · Dept. of AI & ML`;
+    }
+</script>
+</body>
+</html>

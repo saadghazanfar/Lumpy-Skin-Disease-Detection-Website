@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction — LSDDetect</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ── DARK THEME (default) ── */
+        :root {
+            --bg: #050d0a; --surface: #0c1a14; --surface2: #122010;
+            --border: #1e3a28; --border-bright: #2d5a3d;
+            --accent: #22c55e; --accent-dim: #16a34a;
+            --accent-glow: rgba(34,197,94,0.15); --accent-glow2: rgba(34,197,94,0.06);
+            --danger: #f43f5e; --warning: #fb923c;
+            --text: #e8f5ee; --text-muted: #6b9e7e; --text-faint: #3d6b50; --white: #ffffff;
+            --shadow: rgba(0,0,0,0.4);
+        }
+
+        /* ── LIGHT THEME ── */
+        body.light {
+            --bg: #f0faf4; --surface: #ffffff; --surface2: #f0faf4;
+            --border: #c6e8d4; --border-bright: #86c9a0;
+            --accent: #16a34a; --accent-dim: #15803d;
+            --accent-glow: rgba(22,163,74,0.12); --accent-glow2: rgba(22,163,74,0.06);
+            --danger: #dc2626; --warning: #d97706;
+            --text: #0f2d1c; --text-muted: #2d6b45; --text-faint: #6b9e7e; --white: #ffffff;
+            --shadow: rgba(0,0,0,0.1);
+        }
+
+        /* ── URDU FONT ── */
+        body.urdu, body.urdu * { font-family: 'Noto Nastaliq Urdu', serif !important; }
+        body.urdu .form-label, body.urdu .page-header p,
+        body.urdu .panel-title, body.urdu .upload-text { direction: rtl; text-align: right; }
+        body.urdu .nav-links { flex-direction: row-reverse; }
+        body.urdu .predict-grid { direction: rtl; }
+        body.urdu .result-label, body.urdu .result-confidence { direction: rtl; }
+        body.urdu .recs-list li { direction: rtl; text-align: right; flex-direction: row-reverse; }
+        body.urdu .recs-list li::before { content: "←"; }
+        body.urdu .metrics-row { direction: rtl; }
+
+        html { scroll-behavior: smooth; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; transition: background .3s, color .3s; }
+
+        /* ── NAV ── */
+        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(5,13,10,0.85); backdrop-filter: blur(24px); border-bottom: 1px solid var(--border); transition: background .3s, border-color .3s; }
+        body.light nav { background: rgba(240,250,244,0.92); }
+        .nav-inner { max-width: 1300px; margin: 0 auto; padding: 0 2rem; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .nav-logo { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex-shrink: 0; }
+        .logo-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+        .logo-text { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--text); }
+        .logo-text span { color: var(--accent); }
+        .nav-links { display: flex; gap: .25rem; list-style: none; align-items: center; }
+        .nav-links a { text-decoration: none; color: var(--text-muted); font-size: .9rem; font-weight: 500; padding: .5rem 1rem; border-radius: 6px; transition: all .2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--surface2); }
+
+        /* ── NAV CONTROLS (theme + language) ── */
+        .nav-controls { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+
+        .lang-btn {
+            display: flex; align-items: center; gap: .4rem;
+            padding: .45rem 1rem; border-radius: 100px;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: .82rem; font-weight: 600;
+            cursor: pointer; transition: all .2s; white-space: nowrap;
+        }
+        .lang-btn:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+        .lang-btn .lang-flag { font-size: 1rem; }
+
+        .theme-btn {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--surface2); border: 1px solid var(--border-bright);
+            color: var(--text-muted); font-size: 1.1rem;
+            cursor: pointer; transition: all .2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-btn:hover { background: var(--accent-glow); border-color: var(--accent); }
+
+        /* ── PAGE HEADER ── */
+        .page-header { padding: 8rem 2.5rem 3rem; max-width: 1300px; margin: 0 auto; }
+        .page-header .label { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--accent); text-transform: uppercase; letter-spacing: .15em; margin-bottom: 1rem; }
+        .page-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2rem,4vw,3rem); color: var(--text); letter-spacing: -.02em; margin-bottom: .75rem; }
+        .page-header p { color: var(--text-muted); font-size: 1rem; }
+
+        /* ── LAYOUT ── */
+        .main-container { max-width: 1300px; margin: 0 auto; padding: 0 2.5rem 4rem; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px var(--shadow); transition: background .3s, border-color .3s; }
+        .panel-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .75rem; }
+        .panel-icon { width: 36px; height: 36px; background: var(--accent-glow); border: 1px solid rgba(34,197,94,.25); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+        .panel-title { font-family: 'DM Serif Display', serif; font-size: 1.15rem; color: var(--text); }
+        .panel-body { padding: 2rem; }
+
+        /* ── UPLOAD ── */
+        .upload-zone { border: 2px dashed var(--border-bright); border-radius: 12px; padding: 3rem 1.5rem; text-align: center; cursor: pointer; transition: all .25s; background: var(--surface2); }
+        .upload-zone:hover { border-color: var(--accent); background: var(--accent-glow2); }
+        .upload-zone.has-image { border-color: var(--accent); border-style: solid; background: var(--accent-glow2); }
+        .upload-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+        .upload-text { color: var(--text-muted); font-size: .95rem; margin-bottom: .25rem; }
+        .upload-text strong { color: var(--accent); }
+        .upload-hint { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--text-faint); margin-top: .35rem; }
+        #imageInput { display: none; }
+        .img-preview { width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; margin-top: 1.5rem; display: none; border: 1px solid var(--border); }
+        .img-preview.active { display: block; }
+
+        /* ── SUBMIT BUTTON ── */
+        .submit-btn { width: 100%; padding: 1.1rem; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all .25s; display: flex; align-items: center; justify-content: center; gap: .6rem; margin-top: 1.5rem; }
+        .submit-btn:hover:not(:disabled) { background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(34,197,94,.35); }
+        .submit-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+        /* ── RESULTS ── */
+        .results-section { display: none; margin-top: 1.5rem; animation: fadeInUp .5s ease; }
+        .results-section.active { display: block; }
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+        .result-hero { border-radius: 16px; padding: 2.5rem 2rem; text-align: center; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+        .result-hero.normal { background: linear-gradient(135deg,#0a2218,#0f2f1f); border: 1px solid var(--border-bright); }
+        body.light .result-hero.normal { background: linear-gradient(135deg,#d1fae5,#a7f3d0); border-color: #86c9a0; }
+        .result-hero.normal::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+        .result-hero.lumpy { background: linear-gradient(135deg,#200a0f,#2a0f15); border: 1px solid rgba(244,63,94,.3); }
+        body.light .result-hero.lumpy { background: linear-gradient(135deg,#fee2e2,#fecaca); border-color: #f87171; }
+        .result-hero.lumpy::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--danger),transparent); }
+        .result-emoji { font-size: 3rem; margin-bottom: .75rem; display: block; }
+        .result-label { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: .5rem; }
+        .result-hero.normal .result-label { color: var(--accent); }
+        .result-hero.lumpy .result-label { color: var(--danger); }
+        .result-confidence { font-family: 'JetBrains Mono', monospace; font-size: .9rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+        .conf-bar-bg { background: rgba(128,128,128,.15); height: 6px; border-radius: 6px; overflow: hidden; max-width: 300px; margin: 0 auto; }
+        .conf-bar-fill { height: 100%; border-radius: 6px; transition: width 1.2s cubic-bezier(.23,1,.32,1); }
+        .normal .conf-bar-fill { background: var(--accent); }
+        .lumpy .conf-bar-fill { background: var(--danger); }
+
+        .metrics-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .metric-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; transition: background .3s; }
+        .metric-tile-label { font-size: .75rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; }
+        .metric-tile-value { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--text); }
+        .risk-high { color: var(--danger) !important; }
+        .risk-medium { color: var(--warning) !important; }
+        .risk-low { color: var(--accent) !important; }
+
+        /* ── GRAD-CAM ── */
+        .gradcam-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 1.5rem; transition: background .3s; }
+        .gradcam-header { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .75rem; }
+        .gradcam-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--text); }
+        .gradcam-badge { font-family: 'JetBrains Mono', monospace; font-size: .7rem; background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(34,197,94,.2); padding: .2rem .6rem; border-radius: 100px; margin-left: auto; }
+        .gradcam-body { padding: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .gradcam-img-wrap img { width: 100%; border-radius: 10px; display: block; border: 1px solid var(--border); }
+        .gradcam-img-label { font-family: 'JetBrains Mono', monospace; font-size: .7rem; color: var(--text-faint); text-align: center; margin-top: .5rem; }
+        .legend-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#00f,#0ff,#0f0,#ff0,#f00); margin-bottom: .4rem; }
+        .legend-labels { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: .7rem; color: var(--text-faint); }
+
+        /* ── RECOMMENDATIONS ── */
+        .recs-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 1.5rem; transition: background .3s; }
+        .recs-header { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .5rem; }
+        .recs-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--text); }
+        .recs-list { list-style: none; padding: 0; }
+        .recs-list li { padding: 1rem 1.75rem; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text-muted); display: flex; gap: .75rem; align-items: flex-start; line-height: 1.7; }
+        .recs-list li:last-child { border-bottom: none; }
+        .recs-list li::before { content:"→"; color: var(--accent); font-weight: bold; flex-shrink: 0; margin-top: .05em; }
+        .recs-list li strong { color: var(--text); }
+
+        /* ── REPORT BUTTON ── */
+        .generate-report-wrap { text-align: center; padding: 1rem 0 .5rem; }
+        .report-btn { display: inline-flex; align-items: center; gap: .75rem; padding: 1.1rem 3rem; background: transparent; border: 2px solid var(--accent); color: var(--accent); border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: all .3s; }
+        .report-btn:hover { background: var(--accent); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 28px rgba(34,197,94,.35); }
+
+        /* ── LOADING ── */
+        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(5,13,10,.9); backdrop-filter: blur(12px); z-index: 200; align-items: center; justify-content: center; }
+        body.light .loading-overlay { background: rgba(240,250,244,.9); }
+        .loading-overlay.active { display: flex; }
+        .loading-box { background: var(--surface); border: 1px solid var(--border-bright); border-radius: 20px; padding: 3rem; text-align: center; width: 320px; box-shadow: 0 20px 60px var(--shadow); }
+        .spinner { width: 56px; height: 56px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 1.5rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-title { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: .5rem; }
+        .loading-sub { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--text-muted); }
+        .loading-steps { margin-top: 1rem; display: flex; flex-direction: column; gap: .4rem; }
+        .loading-step { font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--text-faint); opacity: 0; transition: opacity .4s; }
+        .loading-step.active { opacity: 1; color: var(--accent); }
+
+        @media (max-width:900px) {
+            .metrics-row { grid-template-columns: repeat(2,1fr); }
+            .gradcam-body { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+            .lang-btn span.lang-label { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <a href="index.html" class="nav-logo">
+            <div class="logo-icon">🐄</div>
+            <span class="logo-text">LSD<span>Detect</span></span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html" data-en="Home" data-ur="ہوم">Home</a></li>
+            <li><a href="predict.html" class="active" data-en="Prediction" data-ur="تشخیص">Prediction</a></li>
+            <li><a href="dashboard.html" data-en="Dashboard" data-ur="ڈیش بورڈ">Dashboard</a></li>
+            <li><a href="report.html" data-en="Reports" data-ur="رپورٹ">Reports</a></li>
+        </ul>
+        <div class="nav-controls">
+            <!-- Language Toggle -->
+            <button class="lang-btn" id="langBtn" onclick="toggleLanguage()">
+                <span class="lang-flag">🇵🇰</span>
+                <span class="lang-label" id="langLabel">اردو</span>
+            </button>
+            <!-- Theme Toggle -->
+            <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">
+                🌙
+            </button>
+        </div>
+    </div>
+</nav>
+
+<div class="page-header">
+    <h1 data-en="AI-Powered Analysis" data-ur="مصنوعی ذہانت سے تجزیہ">AI-Powered Analysis</h1>
+    <p data-en="Upload a cattle image for instant AI diagnosis" data-ur="فوری تشخیص کے لیے مویشی کی تصویر اپ لوڈ کریں">Upload a cattle image for instant AI diagnosis</p>
+</div>
+
+<div class="main-container">
+
+    <!-- Upload Panel (centered, single column) -->
+    <div class="panel" style="max-width:680px; margin: 0 auto 1.5rem;">
+        <div class="panel-header">
+            <h2 class="panel-title" data-en="Upload Cattle Image" data-ur="مویشی کی تصویر اپ لوڈ کریں">Upload Cattle Image</h2>
+        </div>
+        <div class="panel-body">
+            <div class="upload-zone" id="uploadArea">
+                <div class="upload-text" data-en="Click to upload or drag and drop" data-ur="اپ لوڈ کرنے کے لیے کلک کریں یا گھسیٹ کر چھوڑیں">
+                    Click to upload or <strong>drag and drop</strong>
+                </div>
+                <div class="upload-hint" data-en="JPG · PNG · JPEG · Max 10MB" data-ur="JPG · PNG · JPEG · زیادہ سے زیادہ 10MB">JPG · PNG · JPEG · Max 10MB</div>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+            <img id="imagePreview" class="img-preview" alt="Preview">
+
+            <button class="submit-btn" id="predictBtn" disabled>
+                <span data-en="Analyze & Predict" data-ur="تجزیہ کریں اور تشخیص کریں">Analyze & Predict</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="resultsSection">
+
+        <!-- Result Banner -->
+        <div class="result-hero" id="resultHero">
+            <span class="result-emoji" id="resultEmoji">—</span>
+            <div class="result-label" id="resultLabel">—</div>
+            <div class="result-confidence" id="resultConf">—</div>
+            <div class="conf-bar-bg">
+                <div class="conf-bar-fill" id="confFill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-row">
+            <div class="metric-tile">
+                <div class="metric-tile-label" data-en="Processing Time" data-ur="پروسیسنگ وقت">Processing Time</div>
+                <div class="metric-tile-value" id="metricTime">—</div>
+            </div>
+            <div class="metric-tile">
+                <div class="metric-tile-label" data-en="Temp Risk" data-ur="درجہ حرارت خطرہ">Temp Risk</div>
+                <div class="metric-tile-value" id="metricTemp">—</div>
+            </div>
+            <div class="metric-tile">
+                <div class="metric-tile-label" data-en="Humidity Risk" data-ur="نمی کا خطرہ">Humidity Risk</div>
+                <div class="metric-tile-value" id="metricHumidity">—</div>
+            </div>
+        </div>
+
+        <!-- Grad-CAM -->
+        <div class="gradcam-card">
+            <div class="gradcam-header">
+                <h3 data-en="Grad-CAM Heatmap" data-ur="گریڈ-کیم حرارتی نقشہ">Grad-CAM Heatmap</h3>
+                <span class="gradcam-badge" data-en="AI Attention Visualization" data-ur="مصنوعی ذہانت توجہ کا تصور">AI Attention Visualization</span>
+            </div>
+            <div class="gradcam-body">
+                <div class="gradcam-img-wrap">
+                    <img id="originalImg" src="" alt="Original">
+                    <div class="gradcam-img-label" data-en="// original image" data-ur="// اصل تصویر">// original image</div>
+                </div>
+                <div class="gradcam-img-wrap">
+                    <img id="gradcamImg" src="" alt="Grad-CAM">
+                    <div class="gradcam-img-label" data-en="// attention heatmap overlay" data-ur="// توجہ کا حرارتی نقشہ">// attention heatmap overlay</div>
+                </div>
+            </div>
+            <div style="padding:0 1.5rem 1.5rem;">
+                <div class="legend-bar"></div>
+                <div class="legend-labels">
+                    <span data-en="Low attention" data-ur="کم توجہ">Low attention</span>
+                    <span data-en="High attention" data-ur="زیادہ توجہ">High attention</span>
+                </div>
+                <p style="font-size:.8rem;color:var(--text-faint);margin-top:.75rem;font-family:'JetBrains Mono',monospace;"
+                   data-en="Red/yellow = areas the model focused on most during prediction."
+                   data-ur="سرخ/پیلا = وہ علاقے جہاں ماڈل نے تشخیص کے دوران سب سے زیادہ توجہ دی۔">
+                    Red/yellow = areas the model focused on most during prediction.
+                </p>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="recs-panel">
+            <div class="recs-header">
+                <h3 data-en="Recommendations" data-ur="سفارشات">Recommendations</h3>
+            </div>
+            <ul class="recs-list" id="recsList"></ul>
+        </div>
+
+        <!-- Generate Report -->
+        <div class="generate-report-wrap">
+            <button class="report-btn" id="generateReportBtn">
+                 <span data-en="Generate Diagnostic Report" data-ur="تشخیصی رپورٹ بنائیں">Generate Diagnostic Report</span>
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <div class="loading-title" data-en="Analyzing Image" data-ur="تصویر کا تجزیہ">Analyzing Image</div>
+        <div class="loading-sub" data-en="Running AI inference..." data-ur="مصنوعی ذہانت چل رہی ہے...">Running AI inference...</div>
+        <div class="loading-steps">
+            <div class="loading-step" id="step1" data-en="→ Preprocessing image..." data-ur="→ تصویر پری پروسیسنگ...">→ Preprocessing image...</div>
+            <div class="loading-step" id="step2" data-en="→ Running TFLite model..." data-ur="→ TFLite ماڈل چل رہا ہے...">→ Running TFLite model...</div>
+            <div class="loading-step" id="step3" data-en="→ Generating Grad-CAM..." data-ur="→ گریڈ-کیم بن رہا ہے...">→ Generating Grad-CAM...</div>
+            <div class="loading-step" id="step4" data-en="→ Computing risk analysis..." data-ur="→ خطرے کا تجزیہ...">→ Computing risk analysis...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─────────────────────────────────────────────
+    // THEME
+    // ─────────────────────────────────────────────
+    function toggleTheme() {
+        const isLight = document.body.classList.toggle('light');
+        document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
+        localStorage.setItem('lsdTheme', isLight ? 'light' : 'dark');
+    }
+
+    // ─────────────────────────────────────────────
+    // LANGUAGE
+    // ─────────────────────────────────────────────
+    let currentLang = localStorage.getItem('lsdLang') || 'en';
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'en' ? 'ur' : 'en';
+        localStorage.setItem('lsdLang', currentLang);
+        applyLanguage();
+    }
+
+    function applyLanguage() {
+        const isUrdu = currentLang === 'ur';
+
+        // Toggle Urdu font class
+        document.body.classList.toggle('urdu', isUrdu);
+
+        // Update lang button
+        const btn   = document.getElementById('langBtn');
+        const label = document.getElementById('langLabel');
+        btn.querySelector('.lang-flag').textContent = isUrdu ? '🇬🇧' : '🇵🇰';
+        label.textContent = isUrdu ? 'English' : 'اردو';
+
+        // Translate all elements with data-en / data-ur
+        document.querySelectorAll('[data-en]').forEach(el => {
+            const text = isUrdu ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+            if (!text) return;
+
+            // For elements that contain child elements (like <strong>), only update text nodes
+            if (el.children.length === 0) {
+                el.textContent = text;
+            } else {
+                // Replace only if it's a simple wrapper
+                el.innerHTML = isUrdu
+                    ? el.getAttribute('data-ur')
+                    : el.getAttribute('data-en');
+            }
+        });
+
+        // Translate dynamic result text if results are showing
+        if (document.getElementById('resultsSection').classList.contains('active') && lastResult) {
+            displayResults(lastResult.data, lastResult.processingTime);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // TRANSLATIONS for dynamic content
+    // ─────────────────────────────────────────────
+    const T = {
+        en: {
+            normal:         'NORMAL — HEALTHY',
+            lumpy:          'LUMPY DETECTED',
+            confidence:     'Confidence',
+            rawScore:       'Raw score',
+            processingTime: 'Processing Time',
+            tempRisk:       'Temp Risk',
+            humRisk:        'Humidity Risk',
+            imageLoaded:    'Image loaded',
+            analyzeBtn:     'Analyze & Predict',
+        },
+        ur: {
+            normal:         'نارمل — صحت مند',
+            lumpy:          'گانٹھ دار جلد کی بیماری',
+            confidence:     'اعتماد',
+            rawScore:       'خام اسکور',
+            processingTime: 'پروسیسنگ وقت',
+            tempRisk:       'درجہ حرارت خطرہ',
+            humRisk:        'نمی کا خطرہ',
+            imageLoaded:    'تصویر لوڈ ہوگئی',
+            analyzeBtn:     'تجزیہ کریں',
+        }
+    };
+
+    // ─────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────
+    let uploadedFile = null;
+    let lastResult   = null;
+
+    // ─────────────────────────────────────────────
+    // SAVE TO HISTORY
+    // ─────────────────────────────────────────────
+    function savePredictionToHistory(data, processingTime) {
+        try {
+            const history = JSON.parse(localStorage.getItem('lsdPredictions') || '[]');
+            const entry = {
+                id:                 Date.now(),
+                timestamp:          new Date().toLocaleString('en-GB'),
+                isLumpy:            data.prediction.isLumpy,
+                confidence:         (data.prediction.confidence * 100).toFixed(1),
+                rawScore:           data.prediction.rawScore,
+                status:             data.prediction.status,
+                processingTime:     processingTime,
+                tempRisk:           data.environmentalRisk.tempRisk,
+                humidityRisk:       data.environmentalRisk.humidityRisk,
+                climateSuitability: data.environmentalRisk.climateSuitability,
+                latitude:           data.location.latitude,
+                longitude:          data.location.longitude,
+                envData:            data.envData
+            };
+            history.unshift(entry);
+            if (history.length > 500) history.splice(500);
+            localStorage.setItem('lsdPredictions', JSON.stringify(history));
+            console.log('✓ Saved to history. Total:', history.length);
+        } catch (e) {
+            console.error('Failed to save:', e);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // IMAGE UPLOAD
+    // ─────────────────────────────────────────────
+    const uploadArea   = document.getElementById('uploadArea');
+    const imageInput   = document.getElementById('imageInput');
+    const imagePreview = document.getElementById('imagePreview');
+    const predictBtn   = document.getElementById('predictBtn');
+
+    uploadArea.addEventListener('click', () => imageInput.click());
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--accent)'; });
+    uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = 'var(--border-bright)'; });
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border-bright)';
+        const f = e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) handleImageUpload(f);
+    });
+    imageInput.addEventListener('change', e => {
+        if (e.target.files[0]) handleImageUpload(e.target.files[0]);
+    });
+
+    function handleImageUpload(file) {
+        if (file.size > 10 * 1024 * 1024) { alert('File must be under 10MB'); return; }
+        uploadedFile = file;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            imagePreview.src = ev.target.result;
+            imagePreview.classList.add('active');
+            uploadArea.classList.add('has-image');
+            const t = T[currentLang];
+            uploadArea.querySelector('.upload-text').innerHTML =
+                `<strong style="color:var(--accent)">✓ ${t.imageLoaded} — ${file.name}</strong>`;
+            predictBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ─────────────────────────────────────────────
+    // LOADING STEPS
+    // ─────────────────────────────────────────────
+    let stepInterval = null;
+
+    function startLoadingSteps() {
+        ['step1','step2','step3','step4'].forEach(id =>
+            document.getElementById(id).classList.remove('active'));
+        let i = 0;
+        stepInterval = setInterval(() => {
+            const steps = ['step1','step2','step3','step4'];
+            if (i < steps.length) {
+                document.getElementById(steps[i]).classList.add('active');
+                i++;
+            } else {
+                clearInterval(stepInterval);
+            }
+        }, 700);
+    }
+
+    function stopLoadingSteps() { clearInterval(stepInterval); }
+
+    // ─────────────────────────────────────────────
+    // PREDICT
+    // ─────────────────────────────────────────────
+    predictBtn.addEventListener('click', async () => {
+        if (!uploadedFile) return;
+
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const resultsSection = document.getElementById('resultsSection');
+
+        loadingOverlay.classList.add('active');
+        resultsSection.classList.remove('active');
+        startLoadingSteps();
+
+        const startTime = Date.now();
+        const formData  = new FormData();
+        formData.append('image', uploadedFile);
+
+        // Send default env data silently (backend still needs it)
+        const envDefaults = {
+            longitude: '73.05', latitude: '33.68', meanTemp: '26.5',
+            minTemp: '19.2', maxTemp: '34.8', precipitation: '52.3',
+            cloudCover: '48', humidity: '72', evapotranspiration: '4.2',
+            vaporPressure: '21.5', wetDayFreq: '42'
+        };
+        Object.entries(envDefaults).forEach(([k, v]) => formData.append(k, v));
+
+        try {
+            const resp = await fetch('/api/predict', { method: 'POST', body: formData });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `Server error: HTTP ${resp.status}`);
+            }
+
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.error || 'Prediction failed');
+
+            const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+
+            lastResult = { data, processingTime, imageSrc: imagePreview.src };
+
+            // ── Save to dashboard ──
+            savePredictionToHistory(data, processingTime);
+
+            // ── Display ──
+            displayResults(data, processingTime);
+
+        } catch (err) {
+            alert(`Prediction failed: ${err.message}\n\nMake sure Flask server is running.`);
+            console.error(err);
+        } finally {
+            stopLoadingSteps();
+            loadingOverlay.classList.remove('active');
+            resultsSection.classList.add('active');
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+
+    // ─────────────────────────────────────────────
+    // DISPLAY RESULTS
+    // ─────────────────────────────────────────────
+    function displayResults(data, processingTime) {
+        const pred    = data.prediction;
+        const er      = data.environmentalRisk;
+        const isLumpy = pred.isLumpy;
+        const t       = T[currentLang];
+
+        // Hero banner
+        const hero = document.getElementById('resultHero');
+        hero.className = 'result-hero ' + (isLumpy ? 'lumpy' : 'normal');
+        document.getElementById('resultEmoji').textContent = isLumpy ? '⚠️' : '✅';
+        document.getElementById('resultLabel').textContent = isLumpy ? t.lumpy : t.normal;
+        const confPct = (pred.confidence * 100).toFixed(1);
+        document.getElementById('resultConf').textContent =
+            `${t.confidence}: ${confPct}%  ·  ${t.rawScore}: ${pred.rawScore.toFixed(4)}`;
+        setTimeout(() => {
+            document.getElementById('confFill').style.width = confPct + '%';
+        }, 100);
+
+        // Metrics
+        document.getElementById('metricTime').textContent = processingTime + 's';
+        const tEl = document.getElementById('metricTemp');
+        const hEl = document.getElementById('metricHumidity');
+        tEl.textContent = er.tempRisk;
+        hEl.textContent = er.humidityRisk;
+        tEl.className   = 'metric-tile-value risk-' + er.tempRisk.toLowerCase();
+        hEl.className   = 'metric-tile-value risk-' + er.humidityRisk.toLowerCase();
+
+        // Grad-CAM
+        document.getElementById('originalImg').src = lastResult.imageSrc;
+        document.getElementById('gradcamImg').src  = 'data:image/png;base64,' + data.gradcam;
+
+        // Recommendations
+        document.getElementById('recsList').innerHTML = data.recommendations.map(r => {
+            const colonIdx = r.indexOf(':');
+            const head = r.substring(0, colonIdx);
+            const body = r.substring(colonIdx + 1);
+            return `<li><strong>${head}:</strong>${body}</li>`;
+        }).join('');
+    }
+
+    // ─────────────────────────────────────────────
+    // GENERATE REPORT
+    // ─────────────────────────────────────────────
+    document.getElementById('generateReportBtn').addEventListener('click', () => {
+        if (!lastResult) return;
+        sessionStorage.setItem('lsdReportData', JSON.stringify({
+            ...lastResult.data,
+            processingTime: lastResult.processingTime,
+            imageSrc: lastResult.imageSrc
+        }));
+        window.location.href = 'report.html';
+    });
+
+    // ─────────────────────────────────────────────
+    // INIT — restore saved preferences
+    // ─────────────────────────────────────────────
+    window.addEventListener('load', () => {
+        // Restore theme
+        const savedTheme = localStorage.getItem('lsdTheme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light');
+            document.getElementById('themeBtn').textContent = '🌙';
+        } else {
+            document.getElementById('themeBtn').textContent = '☀️';
+        }
+
+        // Restore language
+        currentLang = localStorage.getItem('lsdLang') || 'en';
+        applyLanguage();
+    });
+</script>
+</body>
+</html>
